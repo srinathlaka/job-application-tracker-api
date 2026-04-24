@@ -107,6 +107,13 @@ class JobApplicationCreate(BaseModel):
     location: str | None = None
     notes: str | None = None
 
+class JobApplicationUpdate(BaseModel):
+    company: str | None = None
+    position: str | None = None
+    status: ApplicationStatus | None = None
+    german_required: bool | None = None
+    location: str | None = None
+    notes: str | None = None
 
 @app.post("/applications")
 def create_application(application: JobApplicationCreate):
@@ -144,6 +151,22 @@ def update_application(application_id: int, updated_application: JobApplication)
             return {
                 "message": "Application updated successfully",
                 "application": updated_application.dict()
+            }
+
+    raise HTTPException(status_code=404, detail="Application not found")
+
+
+@app.patch("/applications/{application_id}")
+def partially_update_application(application_id: int, updated_fields: JobApplicationUpdate):
+    for application in applications:
+        if application["id"] == application_id:
+            update_data = updated_fields.dict(exclude_unset=True)
+
+            application.update(update_data)
+
+            return {
+                "message": "Application updated successfully",
+                "application": application
             }
 
     raise HTTPException(status_code=404, detail="Application not found")
