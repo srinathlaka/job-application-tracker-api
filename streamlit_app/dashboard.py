@@ -1,3 +1,4 @@
+import pandas as pd
 import requests
 import streamlit as st
 
@@ -81,6 +82,7 @@ def update_application_notes(application_id, new_notes):
         st.error("FastAPI backend is not running.")
         return None
 
+
 def delete_application(application_id):
     try:
         response = requests.delete(
@@ -91,6 +93,7 @@ def delete_application(application_id):
     except requests.exceptions.ConnectionError:
         st.error("FastAPI backend is not running.")
         return None
+
 
 st.title("Job Application Tracker")
 st.caption("A Streamlit dashboard connected to a FastAPI backend and SQLite database.")
@@ -263,6 +266,7 @@ with right_col:
                         st.rerun()
                     elif response:
                         st.error(f"Failed to delete application. Status code: {response.status_code}")
+
     else:
         st.info("No applications available to update.")
 
@@ -280,6 +284,18 @@ with header_col2:
     )
 
 if applications:
+    applications_df = pd.DataFrame(applications)
+
+    csv_data = applications_df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        label="Download applications as CSV",
+        data=csv_data,
+        file_name="job_applications.csv",
+        mime="text/csv",
+        use_container_width=True
+    )
+
     st.dataframe(
         applications,
         use_container_width=True,
