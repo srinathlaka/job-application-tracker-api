@@ -18,6 +18,7 @@ class JobApplicationCreate(BaseModel):
     german_required: bool
     location: str | None = None
     notes: str | None = None
+    job_link: str | None = None
 
 
 class JobApplicationUpdate(BaseModel):
@@ -27,6 +28,7 @@ class JobApplicationUpdate(BaseModel):
     german_required: bool | None = None
     location: str | None = None
     notes: str | None = None
+    job_link: str | None = None
 
 
 class JobApplicationResponse(JobApplicationCreate):

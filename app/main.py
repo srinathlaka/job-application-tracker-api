@@ -107,7 +107,8 @@ def create_application(application: JobApplicationCreate, db: Session = Depends(
         status=application.status,
         german_required=application.german_required,
         location=application.location,
-        notes=application.notes
+        notes=application.notes,
+        job_link=application.job_link
     )
 
     db.add(db_application)
@@ -152,6 +153,7 @@ def update_application(
     application.german_required = updated_application.german_required
     application.location = updated_application.location
     application.notes = updated_application.notes
+    application.job_link = updated_application.job_link
 
     db.commit()
     db.refresh(application)

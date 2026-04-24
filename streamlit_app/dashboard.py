@@ -161,6 +161,8 @@ with left_col:
 
         location = st.text_input("Location")
         notes = st.text_area("Notes")
+        job_link = st.text_input("Job ad link")
+        st.warning("Optional: Add the original job ad link so you can reopen it later for interview preparation.")
 
         submitted = st.form_submit_button("Add application", use_container_width=True)
 
@@ -176,7 +178,8 @@ with left_col:
                     "status": status,
                     "german_required": german_required,
                     "location": location.strip() if location.strip() else None,
-                    "notes": notes.strip() if notes.strip() else None
+                    "notes": notes.strip() if notes.strip() else None,
+                    "job_link": job_link.strip() if job_link.strip() else None
                 }
 
                 response = create_application(new_application)
@@ -307,6 +310,7 @@ if applications:
             "status",
             "german_required",
             "location",
+            "job_link",
             "notes",
             "created_at"
         ]

@@ -14,4 +14,5 @@ class Application(Base):
     german_required = Column(Boolean, nullable=False)
     location = Column(String, nullable=True)
     notes = Column(String, nullable=True)
+    job_link = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
