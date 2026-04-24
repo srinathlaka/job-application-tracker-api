@@ -160,9 +160,12 @@ with left_col:
             german_required = st.checkbox("German required")
 
         location = st.text_input("Location")
-        notes = st.text_area("Notes")
         job_link = st.text_input("Job ad link")
-        st.warning("Optional: Add the original job ad link so you can reopen it later for interview preparation.")
+        st.caption(
+            "Optional: Add the original job ad link so you can reopen it later for interview preparation."
+        )
+
+        notes = st.text_area("Notes")
 
         submitted = st.form_submit_button("Add application", use_container_width=True)
 
@@ -178,8 +181,8 @@ with left_col:
                     "status": status,
                     "german_required": german_required,
                     "location": location.strip() if location.strip() else None,
-                    "notes": notes.strip() if notes.strip() else None,
-                    "job_link": job_link.strip() if job_link.strip() else None
+                    "job_link": job_link.strip() if job_link.strip() else None,
+                    "notes": notes.strip() if notes.strip() else None
                 }
 
                 response = create_application(new_application)
@@ -287,6 +290,48 @@ with header_col2:
     )
 
 if applications:
+    st.subheader("Selected application details")
+
+    detail_options = {
+        f'{app["id"]} | {app["company"]} | {app["position"]}': app
+        for app in applications
+    }
+
+    selected_detail_key = st.selectbox(
+        "Select application to view details",
+        list(detail_options.keys()),
+        key="application_detail_selectbox"
+    )
+
+    selected_detail = detail_options[selected_detail_key]
+
+    detail_col1, detail_col2 = st.columns(2)
+
+    with detail_col1:
+        st.write(f"**Company:** {selected_detail['company']}")
+        st.write(f"**Position:** {selected_detail['position']}")
+        st.write(f"**Status:** {selected_detail['status']}")
+        st.write(f"**Location:** {selected_detail.get('location') or 'Not provided'}")
+
+    with detail_col2:
+        st.write(f"**German required:** {selected_detail['german_required']}")
+        st.write(f"**Created at:** {selected_detail.get('created_at', 'Not available')}")
+
+        if selected_detail.get("job_link"):
+            st.link_button(
+                "Open job ad",
+                selected_detail["job_link"],
+                use_container_width=True
+            )
+        else:
+            st.info("No job ad link saved for this application.")
+
+    if selected_detail.get("notes"):
+        st.write("**Notes:**")
+        st.write(selected_detail["notes"])
+
+    st.divider()
+
     applications_df = pd.DataFrame(applications)
 
     csv_data = applications_df.to_csv(index=False).encode("utf-8")
