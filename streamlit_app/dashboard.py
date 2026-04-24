@@ -60,6 +60,44 @@ rejected_count = sum(1 for app in applications if app["status"] == "Rejected")
 
 col1, col2, col3, col4 = st.columns(4)
 
+st.subheader("Add New Application")
+
+with st.form("add_application_form"):
+    company = st.text_input("Company")
+    position = st.text_input("Position")
+
+    status = st.selectbox(
+        "Status",
+        ["Preparing", "Applied", "Interview Scheduled", "Rejected", "Accepted"]
+    )
+
+    german_required = st.checkbox("German required")
+    location = st.text_input("Location")
+    notes = st.text_area("Notes")
+
+    submitted = st.form_submit_button("Add Application")
+
+    if submitted:
+        new_application = {
+            "company": company,
+            "position": position,
+            "status": status,
+            "german_required": german_required,
+            "location": location if location else None,
+            "notes": notes if notes else None
+        }
+
+        response = requests.post(
+            f"{API_URL}/applications",
+            json=new_application
+        )
+
+        if response.status_code == 200:
+            st.success("Application added successfully.")
+            st.rerun()
+        else:
+            st.error("Failed to add application.")
+
 with col1:
     st.metric("Total Applications", total_applications)
 
