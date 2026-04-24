@@ -99,15 +99,29 @@ class JobApplication(BaseModel):
     notes: str | None = None
 
 
+class JobApplicationCreate(BaseModel):
+    company: str
+    position: str
+    status: ApplicationStatus
+    german_required: bool
+    location: str | None = None
+    notes: str | None = None
+
+
 @app.post("/applications")
-def create_application(application: JobApplication):
-    for existing_application in applications:
-        if existing_application["id"] == application.id:
-            raise HTTPException(status_code=400, detail="Application with this ID already exists")
-    applications.append(application.dict())
+def create_application(application: JobApplicationCreate):
+    new_id = max([application["id"] for application in applications], default=0) + 1
+
+    new_application = {
+        "id": new_id,
+        **application.dict()
+    }
+
+    applications.append(new_application)
+
     return {
         "message": "Application added successfully",
-        "application": application.dict()
+        "application": new_application
     }
 
 @app.delete("/applications/{application_id}")
