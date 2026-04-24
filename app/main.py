@@ -2,6 +2,10 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Literal
+from app.database import engine, Base
+from app import models
+
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title = "Job Application Tracker API",
