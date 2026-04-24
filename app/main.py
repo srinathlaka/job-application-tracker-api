@@ -2,10 +2,19 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import Optional, Literal
-from app.database import engine, Base
 from app import models
+from sqlalchemy.orm import Session
+from fastapi import FastAPI, HTTPException, Depends
+from app.database import engine, Base, SessionLocal
 
 Base.metadata.create_all(bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 app = FastAPI(
     title = "Job Application Tracker API",
@@ -68,29 +77,31 @@ ApplicationStatus = Literal[
 ]
 
 @app.get("/applications")
-def get_applications(status: str | None = None, company: str | None = None):
-    filtered_applications = applications
+def get_applications(
+    status: str | None = None,
+    company: str | None = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Application)
 
     if status is not None:
-        filtered_applications = [
-            application for application in filtered_applications
-            if application["status"].lower() == status.lower()
-        ]
+        query = query.filter(models.Application.status == status)
 
     if company is not None:
-        filtered_applications = [
-            application for application in filtered_applications
-            if application["company"].lower() == company.lower()
-        ]
+        query = query.filter(models.Application.company == company)
 
-    return filtered_applications
+    return query.all()
 
 @app.get("/applications/{application_id}")
-def get_application(application_id: int):
-    for application in applications:
-        if application["id"] == application_id:
-            return application
-    raise HTTPException(status_code=404, detail="Application not found")
+def get_application(application_id: int, db: Session = Depends(get_db)):
+    application = db.query(models.Application).filter(
+        models.Application.id == application_id
+    ).first()
+
+    if application is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    return application
 
 
 class JobApplication(BaseModel):
@@ -120,58 +131,93 @@ class JobApplicationUpdate(BaseModel):
     notes: str | None = None
 
 @app.post("/applications")
-def create_application(application: JobApplicationCreate):
-    new_id = max([application["id"] for application in applications], default=0) + 1
+def create_application(application: JobApplicationCreate, db: Session = Depends(get_db)):
+    db_application = models.Application(
+        company=application.company,
+        position=application.position,
+        status=application.status,
+        german_required=application.german_required,
+        location=application.location,
+        notes=application.notes
+    )
 
-    new_application = {
-        "id": new_id,
-        **application.dict()
-    }
-
-    applications.append(new_application)
+    db.add(db_application)
+    db.commit()
+    db.refresh(db_application)
 
     return {
         "message": "Application added successfully",
-        "application": new_application
+        "application": db_application
     }
 
 @app.delete("/applications/{application_id}")
-def delete_application(application_id: int):
-    for application in applications:
-        if application["id"] == application_id:
-            applications.remove(application)
-            return {
-                "message": "Application deleted successfully",
-                "deleted_application": application
-            }
+def delete_application(application_id: int, db: Session = Depends(get_db)):
+    application = db.query(models.Application).filter(
+        models.Application.id == application_id
+    ).first()
 
-    raise HTTPException(status_code=404, detail="Application not found")
+    if application is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    db.delete(application)
+    db.commit()
+
+    return {
+        "message": "Application deleted successfully",
+        "deleted_application_id": application_id
+    }
 
 @app.put("/applications/{application_id}")
-def update_application(application_id: int, updated_application: JobApplication):
-    for index, application in enumerate(applications):
-        if application["id"] == application_id:
-            applications[index] = updated_application.dict()
-            return {
-                "message": "Application updated successfully",
-                "application": updated_application.dict()
-            }
+def update_application(
+    application_id: int,
+    updated_application: JobApplicationCreate,
+    db: Session = Depends(get_db)
+):
+    application = db.query(models.Application).filter(
+        models.Application.id == application_id
+    ).first()
 
-    raise HTTPException(status_code=404, detail="Application not found")
+    if application is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    application.company = updated_application.company
+    application.position = updated_application.position
+    application.status = updated_application.status
+    application.german_required = updated_application.german_required
+    application.location = updated_application.location
+    application.notes = updated_application.notes
+
+    db.commit()
+    db.refresh(application)
+
+    return {
+        "message": "Application updated successfully",
+        "application": application
+    }
 
 
 @app.patch("/applications/{application_id}")
-def partially_update_application(application_id: int, updated_fields: JobApplicationUpdate):
-    for application in applications:
-        if application["id"] == application_id:
-            update_data = updated_fields.dict(exclude_unset=True)
+def partially_update_application(
+    application_id: int,
+    updated_fields: JobApplicationUpdate,
+    db: Session = Depends(get_db)
+):
+    application = db.query(models.Application).filter(
+        models.Application.id == application_id
+    ).first()
 
-            application.update(update_data)
+    if application is None:
+        raise HTTPException(status_code=404, detail="Application not found")
 
-            return {
-                "message": "Application updated successfully",
-                "application": application
-            }
+    update_data = updated_fields.dict(exclude_unset=True)
 
-    raise HTTPException(status_code=404, detail="Application not found")
+    for key, value in update_data.items():
+        setattr(application, key, value)
 
+    db.commit()
+    db.refresh(application)
+
+    return {
+        "message": "Application updated successfully",
+        "application": application
+    }
