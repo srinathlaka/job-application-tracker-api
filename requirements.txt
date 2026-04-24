@@ -1,2 +1,5 @@
-fastapi==0.136.1
-pydantic==2.13.3
+fastapi
+uvicorn
+sqlalchemy
+streamlit
+requests
