@@ -6,7 +6,7 @@ from app import models
 from sqlalchemy.orm import Session
 from fastapi import FastAPI, HTTPException, Depends
 from app.database import engine, Base, SessionLocal
-from app.schemas import JobApplicationCreate, JobApplicationUpdate
+from app.schemas import JobApplicationCreate, JobApplicationUpdate, JobApplicationResponse
 
 Base.metadata.create_all(bind=engine)
 
@@ -70,7 +70,7 @@ applications = [
 ]
 
 
-@app.get("/applications")
+@app.get("/applications", response_model=list[JobApplicationResponse])
 def get_applications(
     status: str | None = None,
     company: str | None = None,
@@ -86,7 +86,7 @@ def get_applications(
 
     return query.all()
 
-@app.get("/applications/{application_id}")
+@app.get("/applications/{application_id}", response_model=JobApplicationResponse)
 def get_application(application_id: int, db: Session = Depends(get_db)):
     application = db.query(models.Application).filter(
         models.Application.id == application_id
@@ -99,7 +99,7 @@ def get_application(application_id: int, db: Session = Depends(get_db)):
 
 
 
-@app.post("/applications")
+@app.post("/applications", response_model=JobApplicationResponse)
 def create_application(application: JobApplicationCreate, db: Session = Depends(get_db)):
     db_application = models.Application(
         company=application.company,
@@ -114,10 +114,7 @@ def create_application(application: JobApplicationCreate, db: Session = Depends(
     db.commit()
     db.refresh(db_application)
 
-    return {
-        "message": "Application added successfully",
-        "application": db_application
-    }
+    return db_application
 
 @app.delete("/applications/{application_id}")
 def delete_application(application_id: int, db: Session = Depends(get_db)):
@@ -136,7 +133,7 @@ def delete_application(application_id: int, db: Session = Depends(get_db)):
         "deleted_application_id": application_id
     }
 
-@app.put("/applications/{application_id}")
+@app.put("/applications/{application_id}", response_model=JobApplicationResponse)
 def update_application(
     application_id: int,
     updated_application: JobApplicationCreate,
@@ -159,13 +156,10 @@ def update_application(
     db.commit()
     db.refresh(application)
 
-    return {
-        "message": "Application updated successfully",
-        "application": application
-    }
+    return application
 
 
-@app.patch("/applications/{application_id}")
+@app.patch("/applications/{application_id}", response_model=JobApplicationResponse)
 def partially_update_application(
     application_id: int,
     updated_fields: JobApplicationUpdate,
@@ -186,7 +180,4 @@ def partially_update_application(
     db.commit()
     db.refresh(application)
 
-    return {
-        "message": "Application updated successfully",
-        "application": application
-    }
+    return application

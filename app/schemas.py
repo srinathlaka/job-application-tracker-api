@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from typing import Literal
+from datetime import datetime
 
 ApplicationStatus = Literal[
     "Preparing",
@@ -26,3 +27,11 @@ class JobApplicationUpdate(BaseModel):
     german_required: bool | None = None
     location: str | None = None
     notes: str | None = None
+
+
+class JobApplicationResponse(JobApplicationCreate):
+    id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
