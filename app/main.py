@@ -94,9 +94,7 @@ def delete_application(application_id: int):
                 "deleted_application": application
             }
 
-    return {
-        "error": "Application not found"
-    }
+    raise HTTPException(status_code=404, detail="Application not found")
 
 @app.put("/applications/{application_id}")
 def update_application(application_id: int, updated_application: JobApplication):
@@ -108,7 +106,5 @@ def update_application(application_id: int, updated_application: JobApplication)
                 "application": updated_application.dict()
             }
 
-    return {
-        "error": "Application not found"
-    }
+    raise HTTPException(status_code=404, detail="Application not found")
 
