@@ -1,6 +1,7 @@
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import Optional, Literal
 
 app = FastAPI(
     title = "Job Application Tracker API",
@@ -54,16 +55,36 @@ applications = [
 
 ]
 
+ApplicationStatus = Literal[
+    "Preparing",
+    "Applied",
+    "Interview Scheduled",
+    "Rejected",
+    "Accepted"
+]
+
 @app.get("/applications")
-def get_applications():
-    return applications
+def get_applications(status: str | None = None, company: str | None = None):
+    filtered_applications = applications
+
+    if status is not None:
+        filtered_applications = [
+            application for application in filtered_applications
+            if application["status"].lower() == status.lower()
+        ]
+
+    if company is not None:
+        filtered_applications = [
+            application for application in filtered_applications
+            if application["company"].lower() == company.lower()
+        ]
+
+    return filtered_applications
 
 @app.get("/applications/{application_id}")
 def get_application(application_id: int):
     for application in applications:
         if application["id"] == application_id:
-            return application
-        elif application["id"] == application_id:
             return application
     raise HTTPException(status_code=404, detail="Application not found")
 
@@ -72,12 +93,17 @@ class JobApplication(BaseModel):
     id: int
     company: str
     position: str
-    status: str
+    status: ApplicationStatus
     german_required: bool
+    location: str | None = None
+    notes: str | None = None
 
 
 @app.post("/applications")
 def create_application(application: JobApplication):
+    for existing_application in applications:
+        if existing_application["id"] == application.id:
+            raise HTTPException(status_code=400, detail="Application with this ID already exists")
     applications.append(application.dict())
     return {
         "message": "Application added successfully",
