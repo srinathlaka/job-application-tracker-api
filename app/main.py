@@ -6,6 +6,7 @@ from app import models
 from sqlalchemy.orm import Session
 from fastapi import FastAPI, HTTPException, Depends
 from app.database import engine, Base, SessionLocal
+from app.schemas import JobApplicationCreate, JobApplicationUpdate
 
 Base.metadata.create_all(bind=engine)
 
@@ -68,13 +69,6 @@ applications = [
 
 ]
 
-ApplicationStatus = Literal[
-    "Preparing",
-    "Applied",
-    "Interview Scheduled",
-    "Rejected",
-    "Accepted"
-]
 
 @app.get("/applications")
 def get_applications(
@@ -104,31 +98,6 @@ def get_application(application_id: int, db: Session = Depends(get_db)):
     return application
 
 
-class JobApplication(BaseModel):
-    id: int
-    company: str
-    position: str
-    status: ApplicationStatus
-    german_required: bool
-    location: str | None = None
-    notes: str | None = None
-
-
-class JobApplicationCreate(BaseModel):
-    company: str
-    position: str
-    status: ApplicationStatus
-    german_required: bool
-    location: str | None = None
-    notes: str | None = None
-
-class JobApplicationUpdate(BaseModel):
-    company: str | None = None
-    position: str | None = None
-    status: ApplicationStatus | None = None
-    german_required: bool | None = None
-    location: str | None = None
-    notes: str | None = None
 
 @app.post("/applications")
 def create_application(application: JobApplicationCreate, db: Session = Depends(get_db)):
