@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
+from datetime import datetime
 
 from app.database import Base
 
@@ -13,3 +14,4 @@ class Application(Base):
     german_required = Column(Boolean, nullable=False)
     location = Column(String, nullable=True)
     notes = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
