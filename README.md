@@ -4,7 +4,7 @@ A RESTful API for tracking job applications, built with FastAPI, SQLite, SQLAlch
 
 ## Project Overview
 
-This project helps manage job applications by storing company names, positions, application status, German language requirement, location, notes, and creation time.
+This project helps manage job applications by storing company names, positions, application status, German language requirement, location, notes, uploaded documents, and creation time.
 
 The main goal of this project is to learn RESTful API development using Python and FastAPI while building a useful job tracking tool.
 
@@ -28,6 +28,7 @@ The main goal of this project is to learn RESTful API development using Python a
 - Filter applications by status and company
 - Validate allowed application statuses
 - Store data permanently using SQLite
+- Upload the CV, cover letter, and additional documents used for each application
 - Automatically generate ID and creation timestamp
 
 ## API Endpoints
@@ -55,6 +56,11 @@ The main goal of this project is to learn RESTful API development using Python a
   "notes": "Prepare cloud and Power BI questions"
 }
 ```
+
+You can also upload documents for a saved application with `POST /applications/{application_id}/documents` using `multipart/form-data` with:
+
+- `document_type`: `CV`, `Cover Letter`, or `Additional`
+- `file`: the document file itself
 
 ## Allowed Status Values
 

@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from pydantic import Field
 from typing import Literal
 from datetime import datetime
 
@@ -9,6 +10,24 @@ ApplicationStatus = Literal[
     "Rejected",
     "Accepted"
 ]
+
+DocumentType = Literal[
+    "CV",
+    "Cover Letter",
+    "Additional"
+]
+
+
+class ApplicationDocumentResponse(BaseModel):
+    id: int
+    application_id: int
+    document_type: DocumentType
+    file_name: str
+    file_path: str
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class JobApplicationCreate(BaseModel):
@@ -34,6 +53,7 @@ class JobApplicationUpdate(BaseModel):
 class JobApplicationResponse(JobApplicationCreate):
     id: int
     created_at: datetime
+    documents: list[ApplicationDocumentResponse] = Field(default_factory=list)
 
     class Config:
         from_attributes = True

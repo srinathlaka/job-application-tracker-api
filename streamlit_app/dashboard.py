@@ -1,8 +1,11 @@
+from pathlib import Path
+
 import pandas as pd
 import requests
 import streamlit as st
 
 API_URL = "http://127.0.0.1:8000"
+REQUEST_TIMEOUT = 8
 
 STATUS_OPTIONS = [
     "Preparing",
@@ -28,7 +31,11 @@ def load_applications(status=None, company=None):
         params["company"] = company.strip()
 
     try:
-        response = requests.get(f"{API_URL}/applications", params=params)
+        response = requests.get(
+            f"{API_URL}/applications",
+            params=params,
+            timeout=REQUEST_TIMEOUT
+        )
 
         if response.status_code == 200:
             return response.json()
@@ -36,7 +43,7 @@ def load_applications(status=None, company=None):
         st.error("Failed to load applications from the API.")
         return []
 
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.RequestException:
         st.error(
             "FastAPI backend is not running. "
             "Start it with: python -m uvicorn app.main:app --reload"
@@ -48,24 +55,122 @@ def create_application(application_data):
     try:
         response = requests.post(
             f"{API_URL}/applications",
-            json=application_data
+            json=application_data,
+            timeout=REQUEST_TIMEOUT
         )
         return response
 
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.RequestException:
         st.error("FastAPI backend is not running.")
         return None
+
+
+def upload_application_document(application_id, document_type, uploaded_file):
+    if uploaded_file is None:
+        return None
+
+    try:
+        response = requests.post(
+            f"{API_URL}/applications/{application_id}/documents",
+            data={"document_type": document_type},
+            timeout=REQUEST_TIMEOUT,
+            files={
+                "file": (
+                    uploaded_file.name,
+                    uploaded_file.getvalue(),
+                    uploaded_file.type or "application/octet-stream"
+                )
+            }
+        )
+        return response
+
+    except requests.exceptions.RequestException:
+        st.error("FastAPI backend is not running.")
+        return None
+
+
+def is_image_document(file_name):
+    image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+    file_name_lower = file_name.lower()
+    return any(file_name_lower.endswith(extension) for extension in image_extensions)
+
+
+def is_pdf_document(file_name):
+    return file_name.lower().endswith(".pdf")
+
+
+def get_document_mime_type(file_name):
+    file_name_lower = file_name.lower()
+
+    if file_name_lower.endswith(".pdf"):
+        return "application/pdf"
+    if file_name_lower.endswith(".png"):
+        return "image/png"
+    if file_name_lower.endswith(".jpg") or file_name_lower.endswith(".jpeg"):
+        return "image/jpeg"
+    if file_name_lower.endswith(".gif"):
+        return "image/gif"
+    if file_name_lower.endswith(".webp"):
+        return "image/webp"
+
+    return "application/octet-stream"
+
+
+def render_pdf_preview(file_path, file_name):
+    # Inline PDF previews via base64 were blocked by some browsers (Chrome).
+    # We now serve PDFs via the backend and open them in a new tab instead.
+    st.info("PDFs open in a new tab. Use the link below to view the document.")
+
+
+def render_document_actions(document):
+    file_path = document.get("file_path")
+    file_name = document["file_name"]
+
+    if not file_path:
+        st.caption("No saved path available")
+        return
+
+    path = Path(file_path)
+
+    if not path.exists():
+        st.warning("Saved file no longer exists on disk.")
+        return
+
+    download_bytes = path.read_bytes()
+
+    st.download_button(
+        label=f"Download {file_name}",
+        data=download_bytes,
+        file_name=file_name,
+        mime=get_document_mime_type(file_name),
+        use_container_width=True,
+        key=f"download_{document['id']}"
+    )
+
+    if is_image_document(file_name):
+        st.image(file_path, caption=file_name, use_container_width=True)
+    elif is_pdf_document(file_name):
+        url_view = f"{API_URL}/documents/{document['id']}/file"
+        url_download = f"{API_URL}/documents/{document['id']}/file?download=true"
+        st.markdown(
+            f'<a href="{url_view}" target="_blank">Open {file_name} in new tab</a> '
+            f'| <a href="{url_download}" target="_blank">Open as download</a>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.caption(file_path)
 
 
 def update_application_status(application_id, new_status):
     try:
         response = requests.patch(
             f"{API_URL}/applications/{application_id}",
-            json={"status": new_status}
+            json={"status": new_status},
+            timeout=REQUEST_TIMEOUT
         )
         return response
 
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.RequestException:
         st.error("FastAPI backend is not running.")
         return None
 
@@ -74,11 +179,12 @@ def update_application_notes(application_id, new_notes):
     try:
         response = requests.patch(
             f"{API_URL}/applications/{application_id}",
-            json={"notes": new_notes}
+            json={"notes": new_notes},
+            timeout=REQUEST_TIMEOUT
         )
         return response
 
-    except requests.exceptions.ConnectionError:
+    except requests.exceptions.RequestException:
         st.error("FastAPI backend is not running.")
         return None
 
@@ -86,7 +192,8 @@ def update_application_notes(application_id, new_notes):
 def delete_application(application_id):
     try:
         response = requests.delete(
-            f"{API_URL}/applications/{application_id}"
+            f"{API_URL}/applications/{application_id}",
+            timeout=REQUEST_TIMEOUT
         )
         return response
 
@@ -166,6 +273,21 @@ with left_col:
         )
 
         notes = st.text_area("Notes")
+        cv_file = st.file_uploader("CV", type=["pdf", "doc", "docx"], key="cv_file")
+        cover_letter_file = st.file_uploader(
+            "Cover letter",
+            type=["pdf", "doc", "docx"],
+            key="cover_letter_file"
+        )
+        additional_files = st.file_uploader(
+            "Additional documents",
+            type=["pdf", "doc", "docx", "txt", "png", "jpg", "jpeg"],
+            accept_multiple_files=True,
+            key="additional_files"
+        )
+        st.caption(
+            "Upload the exact CV and cover letter version you send, plus any supporting files like portfolio, transcript, or certificates."
+        )
 
         submitted = st.form_submit_button("Add application", use_container_width=True)
 
@@ -188,7 +310,43 @@ with left_col:
                 response = create_application(new_application)
 
                 if response and response.status_code == 200:
-                    st.success("Application added successfully.")
+                    application_id = response.json()["id"]
+                    upload_failures = []
+
+                    for document_type, uploaded_file in [
+                        ("CV", cv_file),
+                        ("Cover Letter", cover_letter_file),
+                    ]:
+                        if uploaded_file is None:
+                            continue
+
+                        document_response = upload_application_document(
+                            application_id,
+                            document_type,
+                            uploaded_file
+                        )
+
+                        if not document_response or document_response.status_code != 201:
+                            upload_failures.append(document_type)
+
+                    for uploaded_file in additional_files or []:
+                        document_response = upload_application_document(
+                            application_id,
+                            "Additional",
+                            uploaded_file
+                        )
+
+                        if not document_response or document_response.status_code != 201:
+                            upload_failures.append(uploaded_file.name)
+
+                    if upload_failures:
+                        st.warning(
+                            "Application saved, but some documents failed to upload: "
+                            + ", ".join(upload_failures)
+                        )
+                    else:
+                        st.success("Application and documents added successfully.")
+
                     st.rerun()
                 elif response:
                     st.error(f"Failed to add application. Status code: {response.status_code}")
@@ -330,9 +488,26 @@ if applications:
         st.write("**Notes:**")
         st.write(selected_detail["notes"])
 
+    documents = selected_detail.get("documents", [])
+
+    if documents:
+        st.write("**Documents used:**")
+
+        for document in documents:
+            with st.container(border=True):
+                st.write(f"**{document['document_type']}**: {document['file_name']}")
+                render_document_actions(document)
+    else:
+        st.info("No documents uploaded for this application.")
+
     st.divider()
 
-    applications_df = pd.DataFrame(applications)
+    applications_for_table = [
+        {key: value for key, value in app.items() if key != "documents"}
+        for app in applications
+    ]
+
+    applications_df = pd.DataFrame(applications_for_table)
 
     csv_data = applications_df.to_csv(index=False).encode("utf-8")
 
@@ -345,7 +520,7 @@ if applications:
     )
 
     st.dataframe(
-        applications,
+        applications_for_table,
         use_container_width=True,
         hide_index=True,
         column_order=[

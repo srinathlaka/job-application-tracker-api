@@ -1,14 +1,23 @@
+from pathlib import Path
+import mimetypes
+from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Optional, Literal
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form, Query
+from fastapi.responses import FileResponse
 from app import models
 from sqlalchemy.orm import Session
-from fastapi import FastAPI, HTTPException, Depends
 from app.database import engine, Base, SessionLocal
-from app.schemas import JobApplicationCreate, JobApplicationUpdate, JobApplicationResponse
+from app.schemas import (
+    JobApplicationCreate,
+    JobApplicationUpdate,
+    JobApplicationResponse,
+    ApplicationDocumentResponse,
+    DocumentType,
+)
 
 Base.metadata.create_all(bind=engine)
+
+UPLOAD_ROOT = Path("uploaded_documents")
 
 def get_db():
     db = SessionLocal()
@@ -116,6 +125,82 @@ def create_application(application: JobApplicationCreate, db: Session = Depends(
     db.refresh(db_application)
 
     return db_application
+
+
+@app.post(
+    "/applications/{application_id}/documents",
+    response_model=ApplicationDocumentResponse,
+    status_code=201
+)
+async def upload_application_document(
+    application_id: int,
+    document_type: DocumentType = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    application = db.query(models.Application).filter(
+        models.Application.id == application_id
+    ).first()
+
+    if application is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+
+    safe_file_name = Path(file.filename).name
+    application_folder = UPLOAD_ROOT / f"application_{application_id}"
+    application_folder.mkdir(parents=True, exist_ok=True)
+
+    stored_file_name = f"{uuid4().hex}_{safe_file_name}"
+    stored_file_path = application_folder / stored_file_name
+
+    file_contents = await file.read()
+    stored_file_path.write_bytes(file_contents)
+
+    db_document = models.ApplicationDocument(
+        application_id=application_id,
+        document_type=document_type,
+        file_name=safe_file_name,
+        file_path=str(stored_file_path),
+    )
+
+    db.add(db_document)
+    db.commit()
+    db.refresh(db_document)
+
+    return db_document
+
+
+@app.get("/documents/{document_id}/file")
+def serve_document_file(document_id: int, download: bool = Query(False), db: Session = Depends(get_db)):
+    doc = db.query(models.ApplicationDocument).filter(
+        models.ApplicationDocument.id == document_id
+    ).first()
+
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    stored_path = Path(doc.file_path)
+
+    try:
+        stored_resolved = stored_path.resolve()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid file path")
+
+    upload_root_resolved = UPLOAD_ROOT.resolve()
+
+    if not str(stored_resolved).startswith(str(upload_root_resolved)):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not stored_resolved.exists():
+        raise HTTPException(status_code=404, detail="File not found on disk")
+
+    mime_type, _ = mimetypes.guess_type(doc.file_name)
+    if mime_type is None:
+        mime_type = "application/octet-stream"
+
+    disposition = f'attachment; filename="{doc.file_name}"' if download else f'inline; filename="{doc.file_name}"'
+    headers = {"Content-Disposition": disposition}
+
+    return FileResponse(path=stored_resolved, media_type=mime_type, headers=headers)
 
 @app.delete("/applications/{application_id}")
 def delete_application(application_id: int, db: Session = Depends(get_db)):
